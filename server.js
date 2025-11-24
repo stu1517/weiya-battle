@@ -7,47 +7,72 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// 設定靜態檔案位置
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 遊戲狀態
 let gameState = {
-    teamA: 0, // 例如：業務部 + 行銷部
-    teamB: 0, // 例如：研發部 + 後勤部
-    started: false
+    teamA: 0,
+    teamB: 0,
+    started: false,
+    timer: null // 用來存放倒數計時器物件
 };
 
-io.on('connection', (socket) => {
-    // 當新用戶連線，傳送當前分數
-    socket.emit('updateScore', gameState);
+const GAME_DURATION = 30; // 遊戲秒數設定
 
-    // 接收手機端的點擊事件
+io.on('connection', (socket) => {
+    socket.emit('updateScore', gameState);
+    socket.emit('gameStatus', gameState.started);
+
     socket.on('click', (team) => {
-        if (!gameState.started) return; // 遊戲還沒開始不能按
+        if (!gameState.started) return;
         
         if (team === 'A') gameState.teamA++;
         else if (team === 'B') gameState.teamB++;
         
-        // 優化：不需每次點擊都廣播，可以設定每 100ms 廣播一次以減輕流量，
-        // 但為了簡單起見，這裡示範即時廣播
         io.emit('updateScore', gameState);
     });
 
-    // 管理員控制：開始/重置遊戲
     socket.on('adminAction', (action) => {
         if (action === 'reset') {
+            // 重置遊戲
             gameState.teamA = 0;
             gameState.teamB = 0;
             gameState.started = false;
-        } else if (action === 'start') {
+            clearTimeout(gameState.timer); // 清除舊的計時器
+            io.emit('updateScore', gameState);
+            io.emit('resetGame'); // 通知前端重置畫面
+            
+        } else if (action === 'start' && !gameState.started) {
+            // 開始遊戲
+            gameState.teamA = 0; // 確保分數歸零
+            gameState.teamB = 0;
             gameState.started = true;
+            
+            // 廣播開始，並告訴前端倒數幾秒
+            io.emit('updateScore', gameState);
+            io.emit('gameStart', GAME_DURATION);
+
+            // 伺服器端設定 30 秒後自動結束
+            gameState.timer = setTimeout(() => {
+                gameState.started = false;
+                
+                // 判斷贏家
+                let winner = 'DRAW';
+                if (gameState.teamA > gameState.teamB) winner = 'A';
+                else if (gameState.teamB > gameState.teamA) winner = 'B';
+                
+                // 廣播遊戲結束與贏家資訊
+                io.emit('gameOver', {
+                    winner: winner,
+                    scoreA: gameState.teamA,
+                    scoreB: gameState.teamB
+                });
+                
+            }, GAME_DURATION * 1000);
         }
-        io.emit('updateScore', gameState);
-        io.emit('gameStatus', gameState.started);
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
