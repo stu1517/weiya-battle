@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>2025 尾牙大亂鬥</title>
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; text-align: center; background: #222; color: #fff; overflow: hidden; }
+        body { margin: 0; font-family: Arial, sans-serif; text-align: center; background: #222; color: #fff; overflow: hidden; touch-action: manipulation; }
         #selection { display: flex; height: 100vh; }
         .team-btn { flex: 1; font-size: 2rem; border: none; cursor: pointer; color: white; font-weight: bold; }
-        #btnA { background: #ff4757; } /* 紅隊 */
-        #btnB { background: #1e90ff; } /* 藍隊 */
+        #btnA { background: #ff4757; } 
+        #btnB { background: #1e90ff; } 
         
         #gameArea { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; }
         #clickBtn { 
@@ -18,6 +18,7 @@
             box-shadow: 0 0 20px rgba(255, 165, 2, 0.8);
             transition: transform 0.05s;
         }
+        #clickBtn:disabled { background: #555; box-shadow: none; cursor: not-allowed; }
         #clickBtn:active { transform: scale(0.95); }
         h2 { margin-bottom: 20px; }
     </style>
@@ -30,8 +31,8 @@
     </div>
 
     <div id="gameArea">
-        <h2 id="statusText">等待開始...</h2>
-        <button id="clickBtn" onclick="sendClick()">連擊!!</button>
+        <h2 id="statusText">等待主持人開始...</h2>
+        <button id="clickBtn" onclick="sendClick()" disabled>連擊!!</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -47,14 +48,19 @@
         }
 
         function sendClick() {
-            // 手機震動反饋 (提升打擊感)
             if (navigator.vibrate) navigator.vibrate(50);
             socket.emit('click', myTeam);
         }
 
         socket.on('gameStatus', (started) => {
-            document.getElementById('statusText').innerText = started ? "瘋狂點擊！！！" : "遊戲暫停/結束";
+            document.getElementById('statusText').innerText = started ? "瘋狂點擊！！！" : "等待主持人開始...";
             document.getElementById('clickBtn').disabled = !started;
+            document.getElementById('clickBtn').style.background = started ? "#ffa502" : "#555";
+        });
+        
+        // 確保剛進來時如果是未開始狀態，按鈕要是灰的
+        socket.on('connect', () => {
+             // 可以主動請求一次狀態，或等待 server 推送
         });
     </script>
 </body>

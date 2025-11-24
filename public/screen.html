@@ -7,14 +7,11 @@
     <style>
         body { background: #1e272e; color: #fff; font-family: 'Arial Black', sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
         
-        /* 標題 */
         #header { font-size: 2.5rem; text-align: center; padding: 20px; color: #fbc531; text-shadow: 0 0 20px #fbc531; letter-spacing: 5px; z-index: 5; }
         
-        /* 倒數計時器 (位於正中央) */
         #timer-container { font-size: 8rem; text-align: center; margin-bottom: 10px; color: #fff; text-shadow: 0 0 30px rgba(255,255,255,0.8); z-index: 5; transition: color 0.2s; }
         .urgent { color: #ff3f34 !important; text-shadow: 0 0 50px #ff3f34 !important; transform: scale(1.2); }
 
-        /* 戰場區域 */
         #battle-field { flex: 1; display: flex; flex-direction: column; justify-content: center; position: relative; padding: 0 50px; }
         
         .bar-container { width: 100%; height: 150px; background: #2f3640; border-radius: 75px; overflow: hidden; border: 8px solid #dcdde1; display: flex; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
@@ -24,12 +21,10 @@
         .score-text { font-size: 5rem; margin: 0 40px; white-space: nowrap; z-index: 2; text-shadow: 3px 3px 6px rgba(0,0,0,0.6); }
         .center-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 8px; background: #fff; transform: translateX(-50%); z-index: 10; box-shadow: 0 0 20px white; }
 
-        /* 贏家結算畫面 (彈窗) */
         #winner-overlay { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(0,0,0,0.9); z-index: 100; 
-            display: none; /* 預設隱藏 */
-            flex-direction: column; justify-content: center; align-items: center;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
             animation: fadeIn 0.5s;
         }
         #winner-text { font-size: 6rem; color: #fbc531; margin-bottom: 20px; text-shadow: 0 0 50px #fbc531; }
@@ -39,13 +34,19 @@
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        #controls { position: absolute; bottom: 10px; right: 10px; opacity: 0.3; font-family: Arial; font-size: 12px; }
+        /* 新增：控制面板 */
+        #controls { position: absolute; bottom: 20px; right: 20px; z-index: 200; display: flex; gap: 10px; }
+        .ctrl-btn { padding: 10px 20px; font-size: 1.2rem; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; }
+        .btn-start { background: #44bd32; color: white; }
+        .btn-reset { background: #c23616; color: white; }
+        .btn-start:active, .btn-reset:active { transform: scale(0.95); }
+
     </style>
 </head>
 <body>
     <div id="header">2025 資訊部：雲端拔河大決戰</div>
     
-    <div id="timer-container">30</div>
+    <div id="timer-container">準備開始</div>
 
     <div id="battle-field">
         <div class="bar-container">
@@ -58,9 +59,13 @@
     <div id="winner-overlay">
         <div id="winner-text">WINNER!</div>
         <div id="winner-detail">比分 100 : 90</div>
+        <button class="ctrl-btn btn-reset" onclick="adminAction('reset')" style="margin-top:30px">重新一局</button>
     </div>
 
-    <div id="controls">按 <b>S</b> 開始 | 按 <b>R</b> 重置</div>
+    <div id="controls">
+        <button class="ctrl-btn btn-start" onclick="adminAction('start')">▶ 開始遊戲 (S)</button>
+        <button class="ctrl-btn btn-reset" onclick="adminAction('reset')">⟳ 重置 (R)</button>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -72,7 +77,10 @@
 
         let timerInterval;
 
-        // 1. 分數更新
+        function adminAction(action) {
+            socket.emit('adminAction', action);
+        }
+
         socket.on('updateScore', (state) => {
             const total = state.teamA + state.teamB;
             document.getElementById('scoreA').innerText = state.teamA;
@@ -85,26 +93,18 @@
             document.getElementById('bar-B').style.width = (100 - percentA) + '%';
         });
 
-        // 2. 遊戲開始：啟動倒數
         socket.on('gameStart', (duration) => {
-            overlay.style.display = 'none'; // 隱藏結算畫面
+            overlay.style.display = 'none';
             let timeLeft = duration;
             timerEl.innerText = timeLeft;
-            timerEl.className = ''; // 移除緊急樣式
+            timerEl.className = ''; 
 
-            // 清除舊的計時器，避免重複
             if (timerInterval) clearInterval(timerInterval);
 
             timerInterval = setInterval(() => {
                 timeLeft--;
                 timerEl.innerText = timeLeft;
-                
-                // 最後 5 秒變紅字並且變大
-                if (timeLeft <= 5) {
-                    timerEl.classList.add('urgent');
-                    // 播放一點音效提示 (可選)
-                }
-
+                if (timeLeft <= 5) timerEl.classList.add('urgent');
                 if (timeLeft <= 0) {
                     clearInterval(timerInterval);
                     timerEl.innerText = "TIME UP";
@@ -112,78 +112,57 @@
             }, 1000);
         });
 
-        // 3. 遊戲結束：顯示贏家 + 12 禮炮
         socket.on('gameOver', (result) => {
-            clearInterval(timerInterval); // 確保前端倒數停止
-            
-            // 設定顯示文字
+            clearInterval(timerInterval);
             let winnerName = "平手";
-            winnerText.className = ""; // 重置顏色
+            winnerText.className = "";
 
             if (result.winner === 'A') {
-                winnerName = "紅隊 (業務/行銷) 獲勝！";
+                winnerName = "紅隊 獲勝！";
                 winnerText.classList.add('winner-red');
             } else if (result.winner === 'B') {
-                winnerName = "藍隊 (研發/後勤) 獲勝！";
+                winnerName = "藍隊 獲勝！";
                 winnerText.classList.add('winner-blue');
             } else {
                 winnerName = "平分秋色！";
             }
 
             winnerText.innerText = winnerName;
-            winnerDetail.innerText = `最終比分 ${result.scoreA} : ${result.scoreB}`;
-            
-            // 顯示遮罩
+            winnerDetail.innerText = `${result.scoreA} : ${result.scoreB}`;
             overlay.style.display = 'flex';
-
-            // 發射 12 禮炮
             fireSalute(result.winner);
         });
 
-        // 4. 重置遊戲
         socket.on('resetGame', () => {
             overlay.style.display = 'none';
-            timerEl.innerText = "30";
+            timerEl.innerText = "準備開始";
             timerEl.className = "";
             clearInterval(timerInterval);
         });
 
-        // 鍵盤控制
         document.addEventListener('keydown', (e) => {
-            if(e.key.toLowerCase() === 's') socket.emit('adminAction', 'start');
-            if(e.key.toLowerCase() === 'r') socket.emit('adminAction', 'reset');
+            if(e.key.toLowerCase() === 's') adminAction('start');
+            if(e.key.toLowerCase() === 'r') adminAction('reset');
         });
 
-        // --- 特效函式區 ---
-
-        // 執行 12 響禮炮特效
         function fireSalute(winner) {
-            const duration = 3000; // 特效持續時間
-            const end = Date.now() + duration;
+            const duration = 3000;
+            let colors = ['#ffffff', '#ffd700'];
+            if (winner === 'A') colors = ['#e84118', '#c23616', '#ffffff'];
+            if (winner === 'B') colors = ['#0097e6', '#00a8ff', '#ffffff'];
 
-            // 定義禮炮的顏色
-            let colors = ['#ffffff', '#ffd700']; // 預設金銀
-            if (winner === 'A') colors = ['#e84118', '#c23616', '#ffffff']; // 紅
-            if (winner === 'B') colors = ['#0097e6', '#00a8ff', '#ffffff']; // 藍
-
-            // 設定一個定時器，連續發射 12 次 (模擬 12 響)
             let count = 0;
             const saluteInterval = setInterval(() => {
                 count++;
-                
-                // 在畫面上方隨機位置發射
                 confetti({
                     particleCount: 150,
                     spread: 80,
-                    origin: { y: 0.6, x: Math.random() * 0.4 + 0.3 }, // 集中在畫面中間稍微偏下的位置炸開
+                    origin: { y: 0.6, x: Math.random() * 0.4 + 0.3 },
                     colors: colors,
-                    zIndex: 200 // 確保在遮罩層上面
+                    zIndex: 200
                 });
-
-                if (count >= 12) {
-                    clearInterval(saluteInterval);
-                }
-            }, 300); // 每 0.3 秒發射一發
+                if (count >= 12) clearInterval(saluteInterval);
+            }, 300);
         }
     </script>
 </body>
