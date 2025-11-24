@@ -7,80 +7,89 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// 確保指向 public 資料夾
+// 設定公開資料夾
 app.use(express.static(path.join(__dirname, 'public')));
 
+// 遊戲參數設定
+const GAME_DURATION = 30; // 遊戲秒數
+
+// 遊戲狀態
 let gameState = {
     teamA: 0,
     teamB: 0,
-    started: false, // 預設為 false，必須按開始才會變 true
-    timer: null
+    started: false,
+    timerObj: null // 用來存計時器
 };
 
-const GAME_DURATION = 30; // 遊戲秒數
-
 io.on('connection', (socket) => {
-    // 連線時傳送當前狀態
+    // 連線時同步目前分數與狀態
     socket.emit('updateScore', gameState);
     socket.emit('gameStatus', gameState.started);
 
+    // 接收點擊
     socket.on('click', (team) => {
-        // 如果遊戲還沒開始，忽略點擊
-        if (!gameState.started) return;
+        if (!gameState.started) return; // 沒開始不能按
         
         if (team === 'A') gameState.teamA++;
         else if (team === 'B') gameState.teamB++;
         
-        // 廣播分數
+        // 廣播分數 (為了效能，多人時可優化為節流廣播，但數百人此寫法尚可)
         io.emit('updateScore', gameState);
     });
 
+    // 管理員指令 (S鍵開始, R鍵重置)
     socket.on('adminAction', (action) => {
-        console.log('收到管理員指令:', action); // Debug 用
-
         if (action === 'reset') {
-            gameState.teamA = 0;
-            gameState.teamB = 0;
-            gameState.started = false;
-            clearTimeout(gameState.timer);
-            
-            io.emit('updateScore', gameState);
-            io.emit('resetGame');
-            io.emit('gameStatus', false); // 告訴手機端遊戲重置(暫停)
-
+            resetGame();
         } else if (action === 'start') {
-            // 強制重置分數並開始
-            gameState.teamA = 0;
-            gameState.teamB = 0;
-            gameState.started = true;
-            
-            io.emit('updateScore', gameState);
-            io.emit('gameStart', GAME_DURATION);
-            io.emit('gameStatus', true); // 告訴手機端遊戲開始
-
-            // 倒數計時
-            clearTimeout(gameState.timer);
-            gameState.timer = setTimeout(() => {
-                gameState.started = false;
-                io.emit('gameStatus', false); // 告訴手機端遊戲結束
-                
-                // 判斷贏家
-                let winner = 'DRAW';
-                if (gameState.teamA > gameState.teamB) winner = 'A';
-                else if (gameState.teamB > gameState.teamA) winner = 'B';
-                
-                io.emit('gameOver', {
-                    winner: winner,
-                    scoreA: gameState.teamA,
-                    scoreB: gameState.teamB
-                });
-                
-            }, GAME_DURATION * 1000);
+            if (!gameState.started) startGame();
         }
     });
 });
 
+function startGame() {
+    // 初始化
+    gameState.teamA = 0;
+    gameState.teamB = 0;
+    gameState.started = true;
+    
+    // 通知前端：遊戲開始，倒數 N 秒
+    io.emit('gameStart', GAME_DURATION);
+    io.emit('updateScore', gameState);
+
+    // 伺服器端倒數，時間到自動結束
+    gameState.timerObj = setTimeout(() => {
+        endGame();
+    }, GAME_DURATION * 1000);
+}
+
+function endGame() {
+    gameState.started = false;
+    
+    // 判斷贏家
+    let winner = 'DRAW';
+    if (gameState.teamA > gameState.teamB) winner = 'A';
+    else if (gameState.teamB > gameState.teamA) winner = 'B';
+    
+    // 廣播結果
+    io.emit('gameOver', {
+        winner: winner,
+        scoreA: gameState.teamA,
+        scoreB: gameState.teamB
+    });
+}
+
+function resetGame() {
+    gameState.started = false;
+    gameState.teamA = 0;
+    gameState.teamB = 0;
+    if (gameState.timerObj) clearTimeout(gameState.timerObj); // 清除計時
+    
+    io.emit('resetGame');
+    io.emit('updateScore', gameState);
+}
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });

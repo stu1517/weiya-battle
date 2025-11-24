@@ -2,90 +2,80 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>戰況顯示板</title>
+    <title>2025 尾牙戰況</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-        body { background: #1e272e; color: #fff; font-family: 'Arial Black', sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
+        body { background: #1e272e; color: #fff; font-family: "Arial Black", sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
         
-        #header { font-size: 2.5rem; text-align: center; padding: 20px; color: #fbc531; text-shadow: 0 0 20px #fbc531; letter-spacing: 5px; z-index: 5; }
+        /* 標題 */
+        #header { font-size: 3rem; text-align: center; padding: 20px; color: #fbc531; text-shadow: 0 0 20px #fbc531; letter-spacing: 5px; }
         
-        #timer-container { font-size: 8rem; text-align: center; margin-bottom: 10px; color: #fff; text-shadow: 0 0 30px rgba(255,255,255,0.8); z-index: 5; transition: color 0.2s; }
-        .urgent { color: #ff3f34 !important; text-shadow: 0 0 50px #ff3f34 !important; transform: scale(1.2); }
+        /* 倒數計時 */
+        #timer-box { font-size: 8rem; text-align: center; margin: 10px 0; color: #fff; text-shadow: 0 0 30px rgba(255,255,255,0.5); }
+        .urgent { color: #ff3f34; text-shadow: 0 0 50px #ff3f34 !important; transform: scale(1.2); transition: 0.2s; }
 
-        #battle-field { flex: 1; display: flex; flex-direction: column; justify-content: center; position: relative; padding: 0 50px; }
+        /* 拔河條 */
+        #battle-field { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 50px; }
+        .bar-container { width: 100%; height: 150px; background: #353b48; border-radius: 75px; overflow: hidden; border: 8px solid #dcdde1; display: flex; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
         
-        .bar-container { width: 100%; height: 150px; background: #2f3640; border-radius: 75px; overflow: hidden; border: 8px solid #dcdde1; display: flex; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
         #bar-A { background: linear-gradient(90deg, #c23616, #e84118); width: 50%; transition: width 0.1s linear; display: flex; align-items: center; justify-content: flex-start; }
         #bar-B { background: linear-gradient(90deg, #0097e6, #00a8ff); width: 50%; transition: width 0.1s linear; display: flex; align-items: center; justify-content: flex-end; }
         
-        .score-text { font-size: 5rem; margin: 0 40px; white-space: nowrap; z-index: 2; text-shadow: 3px 3px 6px rgba(0,0,0,0.6); }
-        .center-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 8px; background: #fff; transform: translateX(-50%); z-index: 10; box-shadow: 0 0 20px white; }
+        .score-num { font-size: 4rem; margin: 0 30px; z-index: 2; white-space: nowrap; text-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
+        .center-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 6px; background: #fff; transform: translateX(-50%); z-index: 5; box-shadow: 0 0 15px white; }
 
-        #winner-overlay { 
+        /* 贏家彈窗 */
+        #overlay { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.9); z-index: 100; 
-            display: none; flex-direction: column; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.92); z-index: 100; display: none; 
+            flex-direction: column; justify-content: center; align-items: center;
             animation: fadeIn 0.5s;
         }
-        #winner-text { font-size: 6rem; color: #fbc531; margin-bottom: 20px; text-shadow: 0 0 50px #fbc531; }
-        #winner-detail { font-size: 3rem; color: #fff; }
-        .winner-red { color: #e84118 !important; text-shadow: 0 0 50px #e84118 !important; }
-        .winner-blue { color: #0097e6 !important; text-shadow: 0 0 50px #0097e6 !important; }
-
+        #win-title { font-size: 6rem; margin-bottom: 20px; }
+        #win-score { font-size: 3rem; color: #dcdde1; }
+        .win-red { color: #e84118; text-shadow: 0 0 60px #e84118; }
+        .win-blue { color: #0097e6; text-shadow: 0 0 60px #0097e6; }
+        
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* 新增：控制面板 */
-        #controls { position: absolute; bottom: 20px; right: 20px; z-index: 200; display: flex; gap: 10px; }
-        .ctrl-btn { padding: 10px 20px; font-size: 1.2rem; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; }
-        .btn-start { background: #44bd32; color: white; }
-        .btn-reset { background: #c23616; color: white; }
-        .btn-start:active, .btn-reset:active { transform: scale(0.95); }
-
+        /* 提示字 */
+        #footer { position: absolute; bottom: 10px; right: 20px; color: #7f8fa6; font-size: 14px; font-family: Arial; }
     </style>
 </head>
 <body>
-    <div id="header">2025 資訊部：雲端拔河大決戰</div>
-    
-    <div id="timer-container">準備開始</div>
+    <div id="header">2025 資訊部大亂鬥</div>
+    <div id="timer-box">30</div>
 
     <div id="battle-field">
         <div class="bar-container">
-            <div id="bar-A"><span class="score-text" id="scoreA">0</span></div>
-            <div id="bar-B"><span class="score-text" id="scoreB">0</span></div>
+            <div id="bar-A"><span class="score-num" id="scoreA">0</span></div>
+            <div id="bar-B"><span class="score-num" id="scoreB">0</span></div>
             <div class="center-line"></div>
         </div>
     </div>
 
-    <div id="winner-overlay">
-        <div id="winner-text">WINNER!</div>
-        <div id="winner-detail">比分 100 : 90</div>
-        <button class="ctrl-btn btn-reset" onclick="adminAction('reset')" style="margin-top:30px">重新一局</button>
+    <div id="overlay">
+        <div id="win-title">WINNER</div>
+        <div id="win-score">0 : 0</div>
     </div>
 
-    <div id="controls">
-        <button class="ctrl-btn btn-start" onclick="adminAction('start')">▶ 開始遊戲 (S)</button>
-        <button class="ctrl-btn btn-reset" onclick="adminAction('reset')">⟳ 重置 (R)</button>
-    </div>
+    <div id="footer">按鍵盤 [S] 開始 | 按 [R] 重置</div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const timerEl = document.getElementById('timer-container');
-        const overlay = document.getElementById('winner-overlay');
-        const winnerText = document.getElementById('winner-text');
-        const winnerDetail = document.getElementById('winner-detail');
-
+        const timerBox = document.getElementById('timer-box');
+        const overlay = document.getElementById('overlay');
+        const winTitle = document.getElementById('win-title');
+        const winScore = document.getElementById('win-score');
+        
         let timerInterval;
-
-        function adminAction(action) {
-            socket.emit('adminAction', action);
-        }
 
         socket.on('updateScore', (state) => {
             const total = state.teamA + state.teamB;
             document.getElementById('scoreA').innerText = state.teamA;
             document.getElementById('scoreB').innerText = state.teamB;
-
+            
             let percentA = 50;
             if (total > 0) percentA = (state.teamA / total) * 100;
             
@@ -96,73 +86,76 @@
         socket.on('gameStart', (duration) => {
             overlay.style.display = 'none';
             let timeLeft = duration;
-            timerEl.innerText = timeLeft;
-            timerEl.className = ''; 
+            timerBox.innerText = timeLeft;
+            timerBox.className = ''; 
 
             if (timerInterval) clearInterval(timerInterval);
-
+            
             timerInterval = setInterval(() => {
                 timeLeft--;
-                timerEl.innerText = timeLeft;
-                if (timeLeft <= 5) timerEl.classList.add('urgent');
+                timerBox.innerText = timeLeft;
+                if (timeLeft <= 5) timerBox.className = 'urgent'; // 最後5秒變紅
                 if (timeLeft <= 0) {
                     clearInterval(timerInterval);
-                    timerEl.innerText = "TIME UP";
+                    timerBox.innerText = "TIME UP";
                 }
             }, 1000);
         });
 
         socket.on('gameOver', (result) => {
             clearInterval(timerInterval);
-            let winnerName = "平手";
-            winnerText.className = "";
-
+            
+            // 顯示結果
+            let text = "平手";
+            winTitle.className = "";
+            
             if (result.winner === 'A') {
-                winnerName = "紅隊 獲勝！";
-                winnerText.classList.add('winner-red');
+                text = "紅隊獲勝！";
+                winTitle.classList.add('win-red');
             } else if (result.winner === 'B') {
-                winnerName = "藍隊 獲勝！";
-                winnerText.classList.add('winner-blue');
-            } else {
-                winnerName = "平分秋色！";
+                text = "藍隊獲勝！";
+                winTitle.classList.add('win-blue');
             }
 
-            winnerText.innerText = winnerName;
-            winnerDetail.innerText = `${result.scoreA} : ${result.scoreB}`;
+            winTitle.innerText = text;
+            winScore.innerText = `${result.scoreA} : ${result.scoreB}`;
             overlay.style.display = 'flex';
-            fireSalute(result.winner);
+
+            // 觸發12禮炮
+            fire12Salutes(result.winner);
         });
 
         socket.on('resetGame', () => {
             overlay.style.display = 'none';
-            timerEl.innerText = "準備開始";
-            timerEl.className = "";
+            timerBox.innerText = "30";
+            timerBox.className = "";
             clearInterval(timerInterval);
         });
 
+        // 鍵盤控制
         document.addEventListener('keydown', (e) => {
-            if(e.key.toLowerCase() === 's') adminAction('start');
-            if(e.key.toLowerCase() === 'r') adminAction('reset');
+            if(e.key.toLowerCase() === 's') socket.emit('adminAction', 'start');
+            if(e.key.toLowerCase() === 'r') socket.emit('adminAction', 'reset');
         });
 
-        function fireSalute(winner) {
-            const duration = 3000;
-            let colors = ['#ffffff', '#ffd700'];
-            if (winner === 'A') colors = ['#e84118', '#c23616', '#ffffff'];
-            if (winner === 'B') colors = ['#0097e6', '#00a8ff', '#ffffff'];
-
+        // --- 12禮炮特效函式 ---
+        function fire12Salutes(winner) {
             let count = 0;
-            const saluteInterval = setInterval(() => {
+            let colors = (winner === 'A') ? ['#e84118', '#ffffff'] : ['#0097e6', '#ffffff'];
+            if (winner === 'DRAW') colors = ['#fbc531', '#ffffff'];
+
+            const interval = setInterval(() => {
                 count++;
                 confetti({
                     particleCount: 150,
-                    spread: 80,
-                    origin: { y: 0.6, x: Math.random() * 0.4 + 0.3 },
+                    spread: 70,
+                    origin: { y: 0.6, x: Math.random() * 0.6 + 0.2 }, // 隨機位置
                     colors: colors,
                     zIndex: 200
                 });
-                if (count >= 12) clearInterval(saluteInterval);
-            }, 300);
+
+                if (count >= 12) clearInterval(interval);
+            }, 300); // 每0.3秒發射一次
         }
     </script>
 </body>
