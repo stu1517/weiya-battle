@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>尾牙大亂鬥 - 戰況顯示</title>
+    <style>
+        body { background: #000; color: #fff; font-family: 'Arial Black', sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
+        #header { font-size: 3rem; text-align: center; padding: 20px; color: #ffd700; text-shadow: 0 0 10px #ffd700; }
+        
+        #battle-field { flex: 1; display: flex; align-items: center; position: relative; }
+        
+        /* 拔河的繩子與中心點 */
+        .bar-container { width: 80%; height: 60px; background: #333; margin: 0 auto; border-radius: 30px; position: relative; overflow: hidden; border: 2px solid #555; }
+        .bar-fill { height: 100%; transition: width 0.2s linear; }
+        #bar-A { background: #ff4757; float: left; width: 50%; }
+        #bar-B { background: #1e90ff; float: right; width: 50%; }
+        
+        #score-board { display: flex; justify-content: space-around; font-size: 5rem; margin-bottom: 50px; }
+        .score-a { color: #ff4757; }
+        .score-b { color: #1e90ff; }
+
+        /* 控制按鈕 (平常可隱藏，或用鍵盤事件觸發) */
+        #controls { position: absolute; bottom: 10px; right: 10px; opacity: 0.3; }
+    </style>
+</head>
+<body>
+    <div id="header">2025 資訊部鉅獻：雲端拔河大戰</div>
+    
+    <div id="score-board">
+        <div class="score-a" id="scoreA">0</div>
+        <div class="score-b" id="scoreB">0</div>
+    </div>
+
+    <div id="battle-field">
+        <div class="bar-container">
+            <div id="bar-A" style="width: 50%"></div>
+            <div id="bar-B" style="width: 50%"></div>
+            <div style="position: absolute; left: 50%; top:0; height: 100%; width: 4px; background: white; transform: translateX(-50%); z-index: 10;"></div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button onclick="admin('start')">開始</button>
+        <button onclick="admin('reset')">重置</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        socket.on('updateScore', (state) => {
+            const total = state.teamA + state.teamB;
+            document.getElementById('scoreA').innerText = state.teamA;
+            document.getElementById('scoreB').innerText = state.teamB;
+
+            // 計算拔河比例 (預設 50%)
+            let percentA = 50;
+            if (total > 0) {
+                percentA = (state.teamA / total) * 100;
+            }
+            
+            document.getElementById('bar-A').style.width = percentA + '%';
+            document.getElementById('bar-B').style.width = (100 - percentA) + '%';
+        });
+
+        function admin(action) {
+            socket.emit('adminAction', action);
+        }
+        
+        // 鍵盤快速鍵 (S開始, R重置)
+        document.addEventListener('keydown', (e) => {
+            if(e.key === 's' || e.key === 'S') admin('start');
+            if(e.key === 'r' || e.key === 'R') admin('reset');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2025 尾牙大亂鬥</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; text-align: center; background: #222; color: #fff; overflow: hidden; }
+        #selection { display: flex; height: 100vh; }
+        .team-btn { flex: 1; font-size: 2rem; border: none; cursor: pointer; color: white; font-weight: bold; }
+        #btnA { background: #ff4757; } /* 紅隊 */
+        #btnB { background: #1e90ff; } /* 藍隊 */
+        
+        #gameArea { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; }
+        #clickBtn { 
+            width: 250px; height: 250px; border-radius: 50%; border: none; 
+            font-size: 2rem; background: #ffa502; color: white; 
+            box-shadow: 0 0 20px rgba(255, 165, 2, 0.8);
+            transition: transform 0.05s;
+        }
+        #clickBtn:active { transform: scale(0.95); }
+        h2 { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="selection">
+        <button id="btnA" class="team-btn" onclick="selectTeam('A')">我是<br>紅隊</button>
+        <button id="btnB" class="team-btn" onclick="selectTeam('B')">我是<br>藍隊</button>
+    </div>
+
+    <div id="gameArea">
+        <h2 id="statusText">等待開始...</h2>
+        <button id="clickBtn" onclick="sendClick()">連擊!!</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let myTeam = '';
+
+        function selectTeam(team) {
+            myTeam = team;
+            document.getElementById('selection').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'flex';
+            document.body.style.background = team === 'A' ? '#ff4757' : '#1e90ff';
+        }
+
+        function sendClick() {
+            // 手機震動反饋 (提升打擊感)
+            if (navigator.vibrate) navigator.vibrate(50);
+            socket.emit('click', myTeam);
+        }
+
+        socket.on('gameStatus', (started) => {
+            document.getElementById('statusText').innerText = started ? "瘋狂點擊！！！" : "遊戲暫停/結束";
+            document.getElementById('clickBtn').disabled = !started;
+        });
+    </script>
+</body>
+</html>
