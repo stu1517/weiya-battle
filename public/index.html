@@ -5,39 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>2025 尾牙大亂鬥</title>
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; text-align: center; background: #111; color: #fff; overflow: hidden; touch-action: manipulation; }
+        body { margin: 0; font-family: Arial, sans-serif; text-align: center; background: #222; color: #fff; overflow: hidden; }
+        #selection { display: flex; height: 100vh; }
+        .team-btn { flex: 1; font-size: 2rem; border: none; cursor: pointer; color: white; font-weight: bold; }
+        #btnA { background: #ff4757; } /* 紅隊 */
+        #btnB { background: #1e90ff; } /* 藍隊 */
         
-        /* 選隊伍畫面 */
-        #selection { display: flex; height: 100vh; width: 100%; }
-        .team-btn { flex: 1; font-size: 2rem; border: none; color: white; font-weight: bold; cursor: pointer; }
-        #btnA { background: #e84118; } /* 紅 */
-        #btnB { background: #0097e6; } /* 藍 */
-        
-        /* 戰鬥畫面 */
         #gameArea { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; }
-        
         #clickBtn { 
-            width: 250px; height: 250px; border-radius: 50%; border: 8px solid rgba(255,255,255,0.8);
-            font-size: 2.5rem; background: #fbc531; color: #2f3640; font-weight: 900;
-            box-shadow: 0 0 40px rgba(251, 197, 49, 0.6); 
+            width: 250px; height: 250px; border-radius: 50%; border: none; 
+            font-size: 2rem; background: #ffa502; color: white; 
+            box-shadow: 0 0 20px rgba(255, 165, 2, 0.8);
             transition: transform 0.05s;
         }
-        #clickBtn:active { transform: scale(0.9); }
-        #clickBtn:disabled { background: #7f8fa6; box-shadow: none; border-color: #555; color: #333; cursor: not-allowed; }
-        
-        #statusText { margin-bottom: 30px; font-size: 1.5rem; min-height: 1.5em; }
+        #clickBtn:active { transform: scale(0.95); }
+        h2 { margin-bottom: 20px; }
     </style>
 </head>
 <body>
 
     <div id="selection">
-        <button id="btnA" class="team-btn" onclick="selectTeam('A')">紅隊<br>(左邊座位)</button>
-        <button id="btnB" class="team-btn" onclick="selectTeam('B')">藍隊<br>(右邊座位)</button>
+        <button id="btnA" class="team-btn" onclick="selectTeam('A')">我是<br>紅隊</button>
+        <button id="btnB" class="team-btn" onclick="selectTeam('B')">我是<br>藍隊</button>
     </div>
 
     <div id="gameArea">
         <h2 id="statusText">等待開始...</h2>
-        <button id="clickBtn" onclick="sendClick()" disabled>連擊!!</button>
+        <button id="clickBtn" onclick="sendClick()">連擊!!</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -49,28 +43,18 @@
             myTeam = team;
             document.getElementById('selection').style.display = 'none';
             document.getElementById('gameArea').style.display = 'flex';
-            document.body.style.background = team === 'A' ? '#e84118' : '#0097e6';
+            document.body.style.background = team === 'A' ? '#ff4757' : '#1e90ff';
         }
 
         function sendClick() {
-            if (navigator.vibrate) navigator.vibrate(30); // 手機震動
+            // 手機震動反饋 (提升打擊感)
+            if (navigator.vibrate) navigator.vibrate(50);
             socket.emit('click', myTeam);
         }
 
-        socket.on('gameStart', () => {
-            document.getElementById('statusText').innerText = "瘋狂點擊！！！";
-            document.getElementById('clickBtn').disabled = false;
-            document.getElementById('clickBtn').style.background = "#fbc531";
-        });
-
-        socket.on('gameOver', () => {
-            document.getElementById('statusText').innerText = "遊戲結束！";
-            document.getElementById('clickBtn').disabled = true;
-        });
-
-        socket.on('resetGame', () => {
-            document.getElementById('statusText').innerText = "等待開始...";
-            document.getElementById('clickBtn').disabled = true;
+        socket.on('gameStatus', (started) => {
+            document.getElementById('statusText').innerText = started ? "瘋狂點擊！！！" : "遊戲暫停/結束";
+            document.getElementById('clickBtn').disabled = !started;
         });
     </script>
 </body>
