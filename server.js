@@ -58,7 +58,7 @@ io.on('connection', (socket) => {
         io.emit('updateScore', { a: gameState.teamA_score, b: gameState.teamB_score });
     });
 
-    // 4. 贏家決定是否繼續
+    // 4. 贏家決定是否繼續 (保留此邏輯，但下一場按鈕會覆蓋它)
     socket.on('continueNextRound', (choice) => {
         const player = players.get(socket.id);
         if (!player) return;
@@ -81,9 +81,9 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- 管理員指令 (關鍵修正區) ---
+    // --- 管理員指令 ---
     socket.on('adminAction', (action) => {
-        console.log(`[Admin Command Received]: ${action}`); // 加入 Log 以便除錯
+        console.log(`[Admin Command]: ${action}`);
 
         if (action === 'start') {
             startGame();
@@ -114,6 +114,7 @@ function broadcastPlayerStats() {
 function startGame() {
     if (gameState.started) return;
 
+    // 檢查人數 (若只剩1人則不需檢查隊伍平衡，直接讓該玩家獲勝或進行特殊處理，這裡維持原邏輯)
     let countA = 0, countB = 0;
     players.forEach(p => {
         if (p.alive) {
@@ -122,7 +123,6 @@ function startGame() {
         }
     });
 
-    // 只有當總存活人數 > 1 時才檢查平衡
     if (countA + countB > 1) {
         if (countA === 0 || countB === 0) {
             io.emit('showWarning', '無法開始！紅隊或藍隊不能為 0 人。');
@@ -160,7 +160,7 @@ function endRound() {
         if (winnerTeam === 'DRAW') {
             winnerNames.push(p.name);
             survivorCount++;
-            io.to(socketId).emit('roundResult', { result: 'draw' }); // 平手視同晉級
+            io.to(socketId).emit('roundResult', { result: 'draw' });
         } 
         else if (p.team === winnerTeam) {
             winnerNames.push(p.name);
@@ -189,26 +189,36 @@ function endRound() {
     }
 }
 
-// 關鍵修正：準備下一場
+// === 關鍵修正：強制準備下一場 ===
 function prepareNextRound() {
-    console.log('Executing prepareNextRound...'); // Log
+    console.log('Preparing next round...');
     
-    // 如果遊戲已結束(冠軍產生)，則不執行，除非重置
-    if (gameState.isGameOver) {
-        console.log('Game is over, cannot go next round.');
-        return; 
+    // 計算存活人數
+    let activeSurvivors = 0;
+    players.forEach(p => { if (p.alive) activeSurvivors++; });
+
+    // 如果只剩 1 人或更少，且已經顯示過冠軍，則不執行 (除非按 Shift+R 重置)
+    // 但為了避免死鎖，如果管理員按了 N，我們盡量允許進入下一回合設定
+    if (gameState.isGameOver && activeSurvivors <= 1) {
+        console.log('Game Over state active.');
+        // 這裡可以選擇是否 return，但為了修復 Bug，我們先讓它重置狀態
     }
 
     gameState.round++;
     gameState.teamA_score = 0;
     gameState.teamB_score = 0;
+    gameState.started = false;
     
-    // 清除隊伍選擇
-    players.forEach(p => {
-        if (p.alive) p.team = '';
+    // 強制重置所有存活玩家的隊伍，並命令手機跳轉
+    players.forEach((p, socketId) => {
+        if (p.alive) {
+            p.team = '';
+            // 關鍵：直接告訴手機「重新選隊」，跳過勝利頁面
+            io.to(socketId).emit('reSelectTeam');
+        }
     });
 
-    console.log(`Round updated to ${gameState.round}, resetting screen.`);
+    console.log(`Round ${gameState.round} ready.`);
     broadcastPlayerStats();
     io.emit('resetScreenForNextRound', gameState.round);
 }
@@ -223,7 +233,6 @@ function resetAllGame() {
 function checkAllForfeit() {
     let activeSurvivors = 0;
     players.forEach(p => { if (p.alive) activeSurvivors++; });
-
     if (activeSurvivors === 0 && !gameState.isGameOver) {
         io.emit('allForfeit'); 
     }

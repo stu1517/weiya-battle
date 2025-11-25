@@ -7,7 +7,7 @@
     <style>
         body { background: #1e272e; color: #fff; font-family: "Microsoft JhengHei", Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
         
-        /* === 關鍵修正 1：讓禮炮特效不擋住滑鼠點擊 === */
+        /* 穿透特效層，避免擋住按鈕 */
         canvas { pointer-events: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; }
 
         #header { font-size: 2rem; text-align: center; padding: 10px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-between; align-items: center; }
@@ -33,7 +33,7 @@
         #bar-B { background: #1e90ff; height: 100%; width: 50%; display: flex; align-items: center; justify-content: flex-end; transition: width 0.1s linear; }
         .score-text { font-size: 5rem; margin: 0 40px; z-index: 10; font-weight: bold; text-shadow: 3px 3px 5px rgba(0,0,0,0.8); }
 
-        /* 贏家/警告 覆蓋層 */
+        /* 覆蓋層 */
         #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn 0.5s; }
         
         #overlay-title { font-size: 6rem; margin-bottom: 10px; text-shadow: 0 0 30px currentColor; }
@@ -45,15 +45,15 @@
 
         #warning-box { position: absolute; top: 20%; background: #c0392b; padding: 20px 40px; border-radius: 10px; font-size: 2rem; display: none; z-index: 200; box-shadow: 0 0 50px red; }
 
-        /* === 關鍵修正 2：提升按鈕層級並確保可點擊 === */
+        /* 按鈕樣式：確保在最上層 */
         .admin-btn { 
-            position: relative; z-index: 1000; /* 強制在最上層 */
+            position: relative; z-index: 1000;
             margin-top: 30px; padding: 15px 40px; font-size: 2rem; 
             background: #00cec9; color: black; border: none; border-radius: 10px; 
             cursor: pointer; font-weight: bold; box-shadow: 0 0 20px #00cec9; 
-            transition: transform 0.1s; 
+            transition: all 0.1s; 
         }
-        .admin-btn:active { transform: scale(0.95); }
+        .admin-btn:active { transform: scale(0.95); background: #81ecec; }
         .admin-btn:hover { background: #81ecec; }
 
         #controls-hint { position: absolute; bottom: 10px; right: 10px; opacity: 0.5; font-size: 1rem; }
@@ -99,7 +99,7 @@
         <div id="winner-list"></div>
         
         <div id="next-action-area">
-            <button class="admin-btn" onclick="triggerNextRound()">下一場比賽 (N)</button>
+            <button id="nextBtn" class="admin-btn" onclick="triggerNextRound()">下一場比賽 (N)</button>
         </div>
     </div>
 
@@ -160,6 +160,12 @@
             const overlay = document.getElementById('overlay');
             const title = document.getElementById('overlay-title');
             const actionArea = document.getElementById('next-action-area');
+            const nextBtn = document.getElementById('nextBtn');
+
+            // 重置按鈕狀態
+            nextBtn.innerText = "下一場比賽 (N)";
+            nextBtn.disabled = false;
+            nextBtn.style.background = "#00cec9";
 
             overlay.style.display = 'flex';
             document.getElementById('overlay-subtitle').innerText = `比分 ${data.scoreA} : ${data.scoreB}`;
@@ -212,12 +218,13 @@
         });
 
         function triggerNextRound() {
-            // 加入 Log 以便確認點擊是否有發生
-            console.log('Admin triggered next round');
+            // 點擊後給予視覺回饋，避免重複點擊
+            const btn = document.getElementById('nextBtn');
+            btn.innerText = "準備中...";
+            btn.style.background = "#7f8fa6";
             socket.emit('adminAction', 'nextRound');
         }
 
-        // === 關鍵修正 3：使用 window 監聽，防止焦點跑掉 ===
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             if (key === 's') socket.emit('adminAction', 'start');
@@ -230,7 +237,6 @@
             if(winner === 'A') colors = ['#ff4757', '#fff'];
             if(winner === 'B') colors = ['#1e90ff', '#fff'];
 
-            // 確保禮炮 Z-Index 不會擋住操作 (雖然 CSS 已經設了 pointer-events: none)
             let count = 0;
             const interval = setInterval(() => {
                 count++;
