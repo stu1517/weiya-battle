@@ -9,11 +9,13 @@
         .page { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; width: 100%; position: absolute; top:0; left:0; background: #222; }
         
         /* 通用按鈕 */
-        .btn { padding: 15px 30px; font-size: 1.5rem; border-radius: 15px; border: none; cursor: pointer; margin: 10px; font-weight: bold; width: 80%; }
-        .btn-green { background: #2ed573; color: white; }
-        .btn-red { background: #ff4757; color: white; }
-        .btn-blue { background: #1e90ff; color: white; }
-        .btn-grey { background: #747d8c; color: white; }
+        .btn { padding: 15px 30px; font-size: 1.5rem; border-radius: 15px; border: none; cursor: pointer; margin: 10px; font-weight: bold; width: 80%; transition: transform 0.1s; }
+        .btn:active { transform: scale(0.95); }
+        
+        .btn-green { background: #2ed573; color: white; box-shadow: 0 4px 0 #218c74; }
+        .btn-red { background: #ff4757; color: white; box-shadow: 0 4px 0 #c0392b; }
+        .btn-blue { background: #1e90ff; color: white; box-shadow: 0 4px 0 #3742fa; }
+        .btn-grey { background: #747d8c; color: white; box-shadow: 0 4px 0 #2f3542; }
         
         input { padding: 15px; font-size: 1.5rem; border-radius: 10px; width: 70%; text-align: center; margin-bottom: 20px; }
 
@@ -33,6 +35,20 @@
         #winChoicePage { background: #ffa502; }
         #winChoicePage h1 { font-size: 3rem; margin-bottom: 20px; text-shadow: 0 0 10px black; }
         
+        /* === 新增：二次確認視窗樣式 === */
+        #confirmModal { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.9); z-index: 999; 
+            display: none; /* 預設隱藏 */
+            flex-direction: column; justify-content: center; align-items: center;
+        }
+        .modal-box { 
+            background: #2f3542; padding: 30px; border-radius: 20px; width: 80%; 
+            border: 2px solid #ff4757; box-shadow: 0 0 20px #ff4757;
+        }
+        .modal-title { font-size: 2rem; color: #ff4757; margin-bottom: 10px; font-weight: bold; }
+        .modal-desc { font-size: 1.2rem; margin-bottom: 30px; color: #ccc; }
+
         /* 訊息文字 */
         .info-text { font-size: 1.5rem; margin: 20px; line-height: 1.5; }
         .warning-toast { position: fixed; top: 10%; left: 50%; transform: translateX(-50%); background: rgba(255,0,0,0.9); padding: 15px; border-radius: 10px; display: none; z-index: 999; }
@@ -41,6 +57,19 @@
 <body>
     
     <div id="toast" class="warning-toast">隊伍人數不平衡，請重新分配！</div>
+
+    <div id="confirmModal">
+        <div class="modal-box">
+            <div class="modal-title">⚠️ 警告 ⚠️</div>
+            <div class="modal-desc">
+                您確定要放棄比賽嗎？<br>
+                放棄後將<b>無法</b>參加下一場！
+            </div>
+            <button class="btn btn-green" onclick="closeConfirmModal()">嚇死我了 (按錯)</button>
+            
+            <button class="btn btn-grey" onclick="realForfeit()">我累了 (確定放棄)</button>
+        </div>
+    </div>
 
     <div id="loginPage" class="page" style="display: flex;">
         <h1>尾牙大逃殺</h1>
@@ -88,11 +117,12 @@
         const socket = io();
         let myTeam = '';
 
-        // 防止手機雙擊縮放
         document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
 
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+            // 隱藏 modal 以防萬一
+            document.getElementById('confirmModal').style.display = 'none';
             document.getElementById(id).style.display = 'flex';
         }
 
@@ -115,27 +145,18 @@
             showPage('teamSelectPage');
         }
 
-        // 伺服器確認加入後，進入等待畫面
         socket.on('waitingForStart', (team) => {
             showPage('waitingPage');
             document.getElementById('waitTeamName').innerText = (team === 'A') ? "我是紅隊" : "我是藍隊";
             document.getElementById('waitTeamName').style.color = (team === 'A') ? "#ff4757" : "#1e90ff";
         });
 
-        // 需求(5) 隊伍不平衡提示
         socket.on('teamUnbalanced', () => {
             const toast = document.getElementById('toast');
             toast.style.display = 'block';
             setTimeout(() => toast.style.display = 'none', 3000);
-            
-            // 如果在等待頁，允許他們重選
-            if(document.getElementById('waitingPage').style.display === 'flex') {
-                // 這裡可以選擇強制跳回，或者讓使用者自己按「重選」
-                // 為了體驗，我們只顯示 Toast 警告
-            }
         });
 
-        // 遊戲開始
         socket.on('gameStart', (duration) => {
             showPage('gamePage');
             document.getElementById('clickBtn').disabled = false;
@@ -155,35 +176,47 @@
             socket.emit('click', myTeam);
         }
 
-        // 回合結果通知
         socket.on('roundResult', (data) => {
             if (data.result === 'win') {
-                showPage('winChoicePage'); // 顯示 Yes/No
+                showPage('winChoicePage'); 
             } else if (data.result === 'lose') {
-                showPage('loserPage'); // 顯示淘汰
+                showPage('loserPage');
             } else {
-                // 平手，直接回到等待或選隊 (依規則定，這邊假設平手晉級)
                 alert('平手！全員晉級！');
                 answerContinue(true); 
             }
         });
 
-        // 需求(3) 玩家選擇是否繼續
+        // === 修改重點：處理選擇邏輯 ===
         function answerContinue(choice) {
-            socket.emit('continueNextRound', choice);
+            if (choice === true) {
+                // 選「是」：直接繼續，不囉唆
+                socket.emit('continueNextRound', true);
+            } else {
+                // 選「否」：開啟二次確認視窗，暫不送出訊號
+                document.getElementById('confirmModal').style.display = 'flex';
+            }
         }
 
-        // 伺服器准許重新選隊
+        // 關閉確認視窗 (按錯了)
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+        }
+
+        // 真的確認要放棄
+        function realForfeit() {
+            closeConfirmModal(); // 關閉視窗
+            socket.emit('continueNextRound', false); // 送出放棄訊號
+        }
+
         socket.on('reSelectTeam', () => {
             showPage('teamSelectPage');
         });
 
-        // 顯示放棄頁面
         socket.on('showForfeit', () => {
             showPage('forfeitPage');
         });
         
-        // 被伺服器強制踢出 (例如非法操作)
         socket.on('forceEliminate', () => {
             showPage('loserPage');
         });
