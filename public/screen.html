@@ -14,7 +14,6 @@
         /* 戰場佈局 */
         #main-stage { flex: 1; display: flex; position: relative; }
         
-        /* 左右名單 */
         .side-panel { width: 22%; background: rgba(0,0,0,0.2); padding: 10px; overflow-y: auto; display: flex; flex-direction: column; }
         .side-panel h2 { text-align: center; margin: 0 0 10px 0; border-bottom: 2px solid #fff; padding-bottom: 5px; }
         .name-tag { display: inline-block; padding: 5px 10px; margin: 3px; background: rgba(255,255,255,0.15); border-radius: 4px; font-size: 1.2rem; }
@@ -22,7 +21,6 @@
         #panel-A h2 { color: #ff4757; border-color: #ff4757; }
         #panel-B h2 { color: #1e90ff; border-color: #1e90ff; }
 
-        /* 中央區域 */
         #center-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
         
         #timer { font-size: 12rem; font-weight: bold; text-shadow: 0 0 30px rgba(255,255,255,0.5); z-index: 5; margin-bottom: 30px; }
@@ -43,10 +41,13 @@
         #winner-list { width: 80%; max-height: 40vh; overflow-y: auto; text-align: center; }
         .win-name { color: #ffd700; font-size: 2rem; margin: 10px; display: inline-block; }
 
-        /* 警告框 */
         #warning-box { position: absolute; top: 20%; background: #c0392b; padding: 20px 40px; border-radius: 10px; font-size: 2rem; display: none; z-index: 200; box-shadow: 0 0 50px red; }
 
-        /* 底部操作提示 */
+        /* 新增：實體按鈕樣式 */
+        .admin-btn { margin-top: 30px; padding: 15px 40px; font-size: 2rem; background: #00cec9; color: black; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; box-shadow: 0 0 20px #00cec9; transition: transform 0.1s; }
+        .admin-btn:active { transform: scale(0.95); }
+        .admin-btn:hover { background: #81ecec; }
+
         #controls-hint { position: absolute; bottom: 10px; right: 10px; opacity: 0.5; font-size: 1rem; }
         
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
@@ -88,7 +89,10 @@
         <div id="overlay-subtitle">比分 0 : 0</div>
         <div id="winner-count">共 0 人晉級</div>
         <div id="winner-list"></div>
-        <div id="next-round-hint" style="margin-top: 30px; font-size: 1.5rem; color: #7f8fa6; animation: pulse 1s infinite;">按下 [N] 進入下一場</div>
+        
+        <div id="next-action-area">
+            <button class="admin-btn" onclick="triggerNextRound()">下一場比賽 (N)</button>
+        </div>
     </div>
 
     <div id="controls-hint">快速鍵: [S] 開始 | [N] 下一場 | [R] 全域重置</div>
@@ -98,14 +102,11 @@
         const socket = io();
         let timerInterval;
 
-        // 1. 更新名單與人數 (含左右列表)
         socket.on('updatePlayerList', (data) => {
             document.getElementById('survivor-info').innerText = `存活人數: ${data.totalSurvivors}`;
             document.getElementById('round-info').innerText = `ROUND ${data.round}`;
-            
             document.getElementById('count-A').innerText = data.A.length;
             document.getElementById('count-B').innerText = data.B.length;
-
             updateList('list-A', data.A);
             updateList('list-B', data.B);
         });
@@ -113,26 +114,22 @@
         function updateList(id, names) {
             const el = document.getElementById(id);
             el.innerHTML = names.map(n => `<span class="name-tag">${n}</span>`).join('');
+            el.parentElement.scrollTop = el.parentElement.scrollHeight;
         }
 
-        // 2. 分數更新
         socket.on('updateScore', (score) => {
             document.getElementById('scoreA').innerText = score.a;
             document.getElementById('scoreB').innerText = score.b;
-            
             const total = score.a + score.b;
             let percentA = 50;
             if (total > 0) percentA = (score.a / total) * 100;
-            
             document.getElementById('bar-A').style.width = percentA + '%';
             document.getElementById('bar-B').style.width = (100 - percentA) + '%';
         });
 
-        // 3. 遊戲開始 (倒數)
         socket.on('gameStart', (duration) => {
             document.getElementById('overlay').style.display = 'none';
             document.getElementById('warning-box').style.display = 'none';
-            
             let timeLeft = duration;
             const timerEl = document.getElementById('timer');
             timerEl.innerText = timeLeft;
@@ -150,23 +147,21 @@
             }, 1000);
         });
 
-        // 4. 回合結束 (需求1, 需求6)
         socket.on('roundOver', (data) => {
             clearInterval(timerInterval);
             const overlay = document.getElementById('overlay');
             const title = document.getElementById('overlay-title');
-            const nextHint = document.getElementById('next-round-hint');
+            const actionArea = document.getElementById('next-action-area');
 
             overlay.style.display = 'flex';
             document.getElementById('overlay-subtitle').innerText = `比分 ${data.scoreA} : ${data.scoreB}`;
             
-            // 處理贏家顯示
             if (data.isUltimateWinner) {
-                // 需求(6) 最終冠軍
                 title.innerText = "👑 最終大逃殺冠軍 👑";
-                title.style.color = "#ffd700"; // 金色
-                nextHint.style.display = 'none'; // 沒有下一場了
+                title.style.color = "#ffd700"; 
+                actionArea.style.display = 'none'; // 冠軍產生後隱藏下一場按鈕
             } else {
+                actionArea.style.display = 'block'; // 顯示按鈕
                 if (data.winnerTeam === 'A') {
                     title.innerText = "紅隊獲勝";
                     title.style.color = "#ff4757";
@@ -177,29 +172,22 @@
                     title.innerText = "平手 (全員晉級)";
                     title.style.color = "#fff";
                 }
-                nextHint.style.display = 'block';
             }
 
-            // 需求(1) 顯示人數與名單
             document.getElementById('winner-count').innerText = `共 ${data.survivorCount} 人晉級`;
             document.getElementById('winner-list').innerHTML = data.winnerNames.map(n => `<span class="win-name">${n}</span>`).join('');
-
-            // 觸發禮炮 (需求1)
             fireSalutes(data.winnerTeam);
         });
 
-        // 需求(2) 準備下一場
         socket.on('resetScreenForNextRound', (round) => {
             document.getElementById('overlay').style.display = 'none';
             document.getElementById('timer').innerText = "30";
-            // 分數歸零
             document.getElementById('scoreA').innerText = 0;
             document.getElementById('scoreB').innerText = 0;
             document.getElementById('bar-A').style.width = "50%";
             document.getElementById('bar-B').style.width = "50%";
         });
 
-        // 警告訊息顯示
         socket.on('showWarning', (msg) => {
             const box = document.getElementById('warning-box');
             box.innerText = msg;
@@ -207,24 +195,28 @@
             setTimeout(() => box.style.display = 'none', 3000);
         });
         
-        // 需求(7) 全部放棄
         socket.on('allForfeit', () => {
             const title = document.getElementById('overlay-title');
             title.innerText = "所有參賽者皆放棄";
             title.style.color = "#7f8fa6";
-            document.getElementById('next-round-hint').style.display = 'none';
+            document.getElementById('next-action-area').style.display = 'none';
             document.getElementById('overlay').style.display = 'flex';
         });
 
-        // 鍵盤控制
-        document.addEventListener('keydown', (e) => {
+        // 觸發下一場 (按鈕或鍵盤都呼叫此函式)
+        function triggerNextRound() {
+            console.log('Triggering Next Round...');
+            socket.emit('adminAction', 'nextRound');
+        }
+
+        // 鍵盤控制 (改為 window level)
+        window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             if (key === 's') socket.emit('adminAction', 'start');
-            if (key === 'n') socket.emit('adminAction', 'nextRound'); // 需求(2)
-            if (key === 'r' && e.shiftKey) socket.emit('adminAction', 'resetAll'); // Shift+R 重置全場
+            if (key === 'n') triggerNextRound(); 
+            if (key === 'r' && e.shiftKey) socket.emit('adminAction', 'resetAll'); 
         });
 
-        // 禮炮特效
         function fireSalutes(winner) {
             let colors = ['#fff', '#ffd700'];
             if(winner === 'A') colors = ['#ff4757', '#fff'];
