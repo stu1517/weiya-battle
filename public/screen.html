@@ -7,11 +7,13 @@
     <style>
         body { background: #1e272e; color: #fff; font-family: "Microsoft JhengHei", Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
         
+        /* === 關鍵修正 1：讓禮炮特效不擋住滑鼠點擊 === */
+        canvas { pointer-events: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; }
+
         #header { font-size: 2rem; text-align: center; padding: 10px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-between; align-items: center; }
         #round-info { color: #fbc531; font-weight: bold; margin-left: 20px; font-size: 2.5rem; }
         #survivor-info { margin-right: 20px; font-size: 1.5rem; color: #00d2d3; }
 
-        /* 戰場佈局 */
         #main-stage { flex: 1; display: flex; position: relative; }
         
         .side-panel { width: 22%; background: rgba(0,0,0,0.2); padding: 10px; overflow-y: auto; display: flex; flex-direction: column; }
@@ -43,8 +45,14 @@
 
         #warning-box { position: absolute; top: 20%; background: #c0392b; padding: 20px 40px; border-radius: 10px; font-size: 2rem; display: none; z-index: 200; box-shadow: 0 0 50px red; }
 
-        /* 新增：實體按鈕樣式 */
-        .admin-btn { margin-top: 30px; padding: 15px 40px; font-size: 2rem; background: #00cec9; color: black; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; box-shadow: 0 0 20px #00cec9; transition: transform 0.1s; }
+        /* === 關鍵修正 2：提升按鈕層級並確保可點擊 === */
+        .admin-btn { 
+            position: relative; z-index: 1000; /* 強制在最上層 */
+            margin-top: 30px; padding: 15px 40px; font-size: 2rem; 
+            background: #00cec9; color: black; border: none; border-radius: 10px; 
+            cursor: pointer; font-weight: bold; box-shadow: 0 0 20px #00cec9; 
+            transition: transform 0.1s; 
+        }
         .admin-btn:active { transform: scale(0.95); }
         .admin-btn:hover { background: #81ecec; }
 
@@ -159,9 +167,9 @@
             if (data.isUltimateWinner) {
                 title.innerText = "👑 最終大逃殺冠軍 👑";
                 title.style.color = "#ffd700"; 
-                actionArea.style.display = 'none'; // 冠軍產生後隱藏下一場按鈕
+                actionArea.style.display = 'none'; 
             } else {
-                actionArea.style.display = 'block'; // 顯示按鈕
+                actionArea.style.display = 'block'; 
                 if (data.winnerTeam === 'A') {
                     title.innerText = "紅隊獲勝";
                     title.style.color = "#ff4757";
@@ -203,13 +211,13 @@
             document.getElementById('overlay').style.display = 'flex';
         });
 
-        // 觸發下一場 (按鈕或鍵盤都呼叫此函式)
         function triggerNextRound() {
-            console.log('Triggering Next Round...');
+            // 加入 Log 以便確認點擊是否有發生
+            console.log('Admin triggered next round');
             socket.emit('adminAction', 'nextRound');
         }
 
-        // 鍵盤控制 (改為 window level)
+        // === 關鍵修正 3：使用 window 監聽，防止焦點跑掉 ===
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             if (key === 's') socket.emit('adminAction', 'start');
@@ -222,6 +230,7 @@
             if(winner === 'A') colors = ['#ff4757', '#fff'];
             if(winner === 'B') colors = ['#1e90ff', '#fff'];
 
+            // 確保禮炮 Z-Index 不會擋住操作 (雖然 CSS 已經設了 pointer-events: none)
             let count = 0;
             const interval = setInterval(() => {
                 count++;
@@ -230,7 +239,7 @@
                     spread: 80,
                     origin: { y: 0.6, x: Math.random() * 0.6 + 0.2 },
                     colors: colors,
-                    zIndex: 200
+                    zIndex: 200 
                 });
                 if(count >= 12) clearInterval(interval);
             }, 300);
