@@ -5,116 +5,189 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>2025 尾牙大亂鬥</title>
     <style>
-        body { margin: 0; font-family: "Microsoft JhengHei", Arial, sans-serif; text-align: center; background: #222; color: #fff; overflow: hidden; }
+        body { margin: 0; font-family: "Microsoft JhengHei", sans-serif; text-align: center; background: #222; color: #fff; overflow: hidden; touch-action: manipulation; }
+        .page { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; width: 100%; position: absolute; top:0; left:0; background: #222; }
         
-        /* 通用全螢幕區塊 */
-        .page { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; width: 100%; }
+        /* 通用按鈕 */
+        .btn { padding: 15px 30px; font-size: 1.5rem; border-radius: 15px; border: none; cursor: pointer; margin: 10px; font-weight: bold; width: 80%; }
+        .btn-green { background: #2ed573; color: white; }
+        .btn-red { background: #ff4757; color: white; }
+        .btn-blue { background: #1e90ff; color: white; }
+        .btn-grey { background: #747d8c; color: white; }
         
-        /* 1. 登入頁 */
-        #login { display: flex; }
-        input { padding: 15px; font-size: 1.5rem; border-radius: 10px; border: none; text-align: center; width: 80%; margin-bottom: 20px; }
-        .btn-confirm { padding: 10px 30px; font-size: 1.5rem; background: #2ed573; color: white; border: none; border-radius: 10px; cursor: pointer; }
+        input { padding: 15px; font-size: 1.5rem; border-radius: 10px; width: 70%; text-align: center; margin-bottom: 20px; }
 
-        /* 2. 選隊伍頁 */
-        #selection { flex-direction: row; }
-        .team-btn { flex: 1; height: 100%; font-size: 2rem; border: none; cursor: pointer; color: white; font-weight: bold; }
-        #btnA { background: #ff4757; } /* 紅隊 */
-        #btnB { background: #1e90ff; } /* 藍隊 */
+        /* 選隊伍頁 */
+        #teamSelectPage { flex-direction: row; }
+        .team-split { flex: 1; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; cursor: pointer; }
+        .bg-red { background: #ff4757; }
+        .bg-blue { background: #1e90ff; }
 
-        /* 3. 遊戲頁 */
-        #clickBtn { 
-            width: 250px; height: 250px; border-radius: 50%; border: 8px solid rgba(255,255,255,0.5); 
-            font-size: 2rem; background: #ffa502; color: white; 
-            box-shadow: 0 0 20px rgba(255, 165, 2, 0.8);
-            transition: transform 0.05s;
-        }
+        /* 遊戲頁 */
+        #gamePage { background: #222; }
+        #clickBtn { width: 260px; height: 260px; border-radius: 50%; border: 8px solid rgba(255,255,255,0.5); font-size: 2rem; background: #ffa502; color: #fff; box-shadow: 0 0 30px #ffa502; font-weight: 900; }
         #clickBtn:active { transform: scale(0.95); }
         #clickBtn:disabled { background: #535c68; box-shadow: none; border-color: #333; }
         
-        h2 { margin-bottom: 20px; font-size: 2rem; }
-        #timerDisplay { font-size: 4rem; color: #ffa502; margin-bottom: 20px; font-weight: bold; }
+        /* 勝利選擇頁 */
+        #winChoicePage { background: #ffa502; }
+        #winChoicePage h1 { font-size: 3rem; margin-bottom: 20px; text-shadow: 0 0 10px black; }
+        
+        /* 訊息文字 */
+        .info-text { font-size: 1.5rem; margin: 20px; line-height: 1.5; }
+        .warning-toast { position: fixed; top: 10%; left: 50%; transform: translateX(-50%); background: rgba(255,0,0,0.9); padding: 15px; border-radius: 10px; display: none; z-index: 999; }
     </style>
 </head>
 <body>
+    
+    <div id="toast" class="warning-toast">隊伍人數不平衡，請重新分配！</div>
 
-    <div id="login" class="page">
-        <h2>請輸入您的姓名</h2>
-        <input type="text" id="username" placeholder="王小明" />
-        <button class="btn-confirm" onclick="confirmName()">下一步</button>
+    <div id="loginPage" class="page" style="display: flex;">
+        <h1>尾牙大逃殺</h1>
+        <p>生存遊戲，強者生存</p>
+        <input type="text" id="username" placeholder="請輸入真實姓名" />
+        <button class="btn btn-green" onclick="doLogin()">進入戰場</button>
     </div>
 
-    <div id="selection" class="page">
-        <button id="btnA" class="team-btn" onclick="joinGame('A')">加入<br>紅隊</button>
-        <button id="btnB" class="team-btn" onclick="joinGame('B')">加入<br>藍隊</button>
+    <div id="teamSelectPage" class="page">
+        <div class="team-split bg-red" onclick="joinTeam('A')">紅隊<br>(加入)</div>
+        <div class="team-split bg-blue" onclick="joinTeam('B')">藍隊<br>(加入)</div>
     </div>
 
-    <div id="gameArea" class="page">
-        <div id="timerDisplay">準備</div>
-        <h2 id="statusText">等待主持人開始...</h2>
+    <div id="waitingPage" class="page">
+        <h2 id="waitTeamName"></h2>
+        <div class="info-text">等待比賽開始...</div>
+        <button class="btn btn-grey" onclick="reselect()">重選隊伍</button>
+    </div>
+
+    <div id="gamePage" class="page">
+        <h2 id="timerDisplay" style="font-size: 4rem; color: #f1c40f;">30</h2>
         <button id="clickBtn" onclick="sendClick()" disabled>連擊!!</button>
+    </div>
+
+    <div id="winChoicePage" class="page">
+        <h1>VICTORY!</h1>
+        <div class="info-text">恭喜晉級！<br>你是本局勝利者</div>
+        <div class="info-text">是否繼續參加下一場？</div>
+        <button class="btn btn-green" onclick="answerContinue(true)">是 (繼續戰鬥)</button>
+        <button class="btn btn-red" onclick="answerContinue(false)">否 (自願放棄)</button>
+    </div>
+
+    <div id="loserPage" class="page" style="background: #2f3542;">
+        <h1 style="color: #747d8c;">ELIMINATED</h1>
+        <div class="info-text">很遺憾，您已被淘汰。<br>請在台下為倖存者加油！</div>
+    </div>
+
+    <div id="forfeitPage" class="page" style="background: #2f3542;">
+        <h1>已放棄</h1>
+        <div class="info-text">您已自願放棄參賽資格。<br>謝謝參與！</div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let myName = '';
         let myTeam = '';
 
-        // 鎖定手機直式操作 (防止誤觸縮放)
+        // 防止手機雙擊縮放
         document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
-
-        function confirmName() {
-            const nameInput = document.getElementById('username').value.trim();
-            if (!nameInput) { alert("請輸入姓名！"); return; }
-            myName = nameInput;
-            showPage('selection');
-        }
-
-        function joinGame(team) {
-            myTeam = team;
-            // 發送加入事件
-            socket.emit('join', { name: myName, team: myTeam });
-            
-            showPage('gameArea');
-            document.body.style.background = (team === 'A') ? '#ff4757' : '#1e90ff';
-            document.getElementById('statusText').innerText = `我是 ${team==='A'?'紅':'藍'}隊：${myName}`;
-        }
 
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
             document.getElementById(id).style.display = 'flex';
         }
 
-        function sendClick() {
-            if (navigator.vibrate) navigator.vibrate(50);
-            socket.emit('click', myTeam);
+        function doLogin() {
+            const name = document.getElementById('username').value.trim();
+            if(!name) return alert('請輸入姓名');
+            socket.emit('login', name);
         }
 
-        // --- 監聽事件 ---
+        socket.on('loginSuccess', () => {
+            showPage('teamSelectPage');
+        });
 
-        socket.on('gameStart', (duration) => {
-            document.getElementById('clickBtn').disabled = false;
-            document.getElementById('clickBtn').style.background = "#ffa502";
+        function joinTeam(team) {
+            myTeam = team;
+            socket.emit('joinTeam', team);
+        }
+
+        function reselect() {
+            showPage('teamSelectPage');
+        }
+
+        // 伺服器確認加入後，進入等待畫面
+        socket.on('waitingForStart', (team) => {
+            showPage('waitingPage');
+            document.getElementById('waitTeamName').innerText = (team === 'A') ? "我是紅隊" : "我是藍隊";
+            document.getElementById('waitTeamName').style.color = (team === 'A') ? "#ff4757" : "#1e90ff";
+        });
+
+        // 需求(5) 隊伍不平衡提示
+        socket.on('teamUnbalanced', () => {
+            const toast = document.getElementById('toast');
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 3000);
             
-            // 手機端倒數視覺 (僅供參考，以 Server 為準)
+            // 如果在等待頁，允許他們重選
+            if(document.getElementById('waitingPage').style.display === 'flex') {
+                // 這裡可以選擇強制跳回，或者讓使用者自己按「重選」
+                // 為了體驗，我們只顯示 Toast 警告
+            }
+        });
+
+        // 遊戲開始
+        socket.on('gameStart', (duration) => {
+            showPage('gamePage');
+            document.getElementById('clickBtn').disabled = false;
+            document.getElementById('gamePage').style.background = (myTeam==='A') ? '#ff4757' : '#1e90ff';
+            
             let timeLeft = duration;
             document.getElementById('timerDisplay').innerText = timeLeft;
             const timer = setInterval(() => {
                 timeLeft--;
+                document.getElementById('timerDisplay').innerText = timeLeft;
                 if(timeLeft <= 0) clearInterval(timer);
-                document.getElementById('timerDisplay').innerText = timeLeft > 0 ? timeLeft : "時間到";
             }, 1000);
         });
 
-        socket.on('gameOver', () => {
-            document.getElementById('clickBtn').disabled = true;
-            document.getElementById('timerDisplay').innerText = "結束";
+        function sendClick() {
+            if (navigator.vibrate) navigator.vibrate(40);
+            socket.emit('click', myTeam);
+        }
+
+        // 回合結果通知
+        socket.on('roundResult', (data) => {
+            if (data.result === 'win') {
+                showPage('winChoicePage'); // 顯示 Yes/No
+            } else if (data.result === 'lose') {
+                showPage('loserPage'); // 顯示淘汰
+            } else {
+                // 平手，直接回到等待或選隊 (依規則定，這邊假設平手晉級)
+                alert('平手！全員晉級！');
+                answerContinue(true); 
+            }
         });
 
-        socket.on('resetGame', () => {
-            // 重置時踢回首頁重新輸入 (或依需求保留)
-            location.reload();
+        // 需求(3) 玩家選擇是否繼續
+        function answerContinue(choice) {
+            socket.emit('continueNextRound', choice);
+        }
+
+        // 伺服器准許重新選隊
+        socket.on('reSelectTeam', () => {
+            showPage('teamSelectPage');
         });
+
+        // 顯示放棄頁面
+        socket.on('showForfeit', () => {
+            showPage('forfeitPage');
+        });
+        
+        // 被伺服器強制踢出 (例如非法操作)
+        socket.on('forceEliminate', () => {
+            showPage('loserPage');
+        });
+
     </script>
 </body>
 </html>
