@@ -2,76 +2,208 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>尾牙大亂鬥 - 戰況顯示</title>
+    <title>戰況顯示板</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-        body { background: #000; color: #fff; font-family: 'Arial Black', sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
-        #header { font-size: 3rem; text-align: center; padding: 20px; color: #ffd700; text-shadow: 0 0 10px #ffd700; }
+        body { background: #1e272e; color: #fff; font-family: "Microsoft JhengHei", 'Arial Black', sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
         
-        #battle-field { flex: 1; display: flex; align-items: center; position: relative; }
-        
-        /* 拔河的繩子與中心點 */
-        .bar-container { width: 80%; height: 60px; background: #333; margin: 0 auto; border-radius: 30px; position: relative; overflow: hidden; border: 2px solid #555; }
-        .bar-fill { height: 100%; transition: width 0.2s linear; }
-        #bar-A { background: #ff4757; float: left; width: 50%; }
-        #bar-B { background: #1e90ff; float: right; width: 50%; }
-        
-        #score-board { display: flex; justify-content: space-around; font-size: 5rem; margin-bottom: 50px; }
-        .score-a { color: #ff4757; }
-        .score-b { color: #1e90ff; }
+        #header { font-size: 2.5rem; text-align: center; padding: 15px; color: #ffd700; text-shadow: 0 0 10px #ffd700; background: rgba(0,0,0,0.3); z-index: 10; }
 
-        /* 控制按鈕 (平常可隱藏，或用鍵盤事件觸發) */
-        #controls { position: absolute; bottom: 10px; right: 10px; opacity: 0.3; }
+        /* 主佈局：左名單 | 中戰場 | 右名單 */
+        #main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
+        
+        /* 兩側名單列表 */
+        .player-list { width: 20%; padding: 10px; overflow-y: auto; background: rgba(0,0,0,0.2); }
+        .player-list h3 { text-align: center; margin: 0 0 10px 0; padding-bottom: 5px; border-bottom: 2px solid #fff; }
+        .list-content { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+        .p-name { padding: 4px 8px; border-radius: 4px; font-size: 1.2rem; background: rgba(255,255,255,0.1); animation: popIn 0.3s ease; }
+        
+        #list-A { border-right: 2px solid #ff4757; }
+        #list-A h3 { color: #ff4757; }
+        #list-B { border-left: 2px solid #1e90ff; }
+        #list-B h3 { color: #1e90ff; }
+
+        /* 中間戰場 */
+        #battle-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+
+        /* 倒數計時 */
+        #timer { font-size: 10rem; font-weight: bold; text-shadow: 0 0 30px rgba(255,255,255,0.5); margin-bottom: 20px; transition: color 0.2s; }
+        .urgent { color: #ff3f34; transform: scale(1.1); text-shadow: 0 0 50px red !important; }
+
+        /* 拔河條 */
+        .bar-container { width: 90%; height: 120px; background: #333; border-radius: 60px; position: relative; overflow: hidden; border: 6px solid #555; display: flex; box-shadow: 0 10px 30px black; }
+        #bar-A { background: #ff4757; width: 50%; display: flex; align-items: center; justify-content: flex-start; transition: width 0.1s linear; }
+        #bar-B { background: #1e90ff; width: 50%; display: flex; align-items: center; justify-content: flex-end; transition: width 0.1s linear; }
+        .score { font-size: 4rem; margin: 0 30px; white-space: nowrap; z-index: 2; text-shadow: 2px 2px 5px black; }
+        
+        /* 贏家結算層 */
+        #winner-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.95); z-index: 100; display: none;
+            flex-direction: column; align-items: center; justify-content: center;
+            animation: fadeIn 0.5s;
+        }
+        #win-title { font-size: 5rem; margin-bottom: 10px; }
+        #win-detail { font-size: 2rem; color: #ccc; margin-bottom: 30px; }
+        #win-names-box { width: 80%; max-height: 40vh; overflow-y: auto; text-align: center; border: 2px solid #555; padding: 20px; border-radius: 15px; background: rgba(255,255,255,0.05); }
+        .winner-name-tag { display: inline-block; font-size: 1.5rem; margin: 5px 10px; color: #ffd700; }
+
+        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 隱藏控制鈕 */
+        #controls { position: absolute; bottom: 5px; right: 5px; opacity: 0.2; }
     </style>
 </head>
 <body>
-    <div id="header">2025 資訊部鉅獻：雲端拔河大戰</div>
+    <div id="header">2025 尾牙雲端拔河 - 誰是總冠軍</div>
     
-    <div id="score-board">
-        <div class="score-a" id="scoreA">0</div>
-        <div class="score-b" id="scoreB">0</div>
-    </div>
+    <div id="main-container">
+        <div id="list-A" class="player-list">
+            <h3>紅隊戰友</h3>
+            <div id="content-A" class="list-content"></div>
+        </div>
 
-    <div id="battle-field">
-        <div class="bar-container">
-            <div id="bar-A" style="width: 50%"></div>
-            <div id="bar-B" style="width: 50%"></div>
-            <div style="position: absolute; left: 50%; top:0; height: 100%; width: 4px; background: white; transform: translateX(-50%); z-index: 10;"></div>
+        <div id="battle-area">
+            <div id="timer">30</div>
+            
+            <div class="bar-container">
+                <div id="bar-A"><span class="score" id="scoreA">0</span></div>
+                <div id="bar-B"><span class="score" id="scoreB">0</span></div>
+                <div style="position: absolute; left: 50%; height: 100%; width: 4px; background: white; transform: translateX(-50%); z-index: 5;"></div>
+            </div>
+        </div>
+
+        <div id="list-B" class="player-list">
+            <h3>藍隊戰友</h3>
+            <div id="content-B" class="list-content"></div>
         </div>
     </div>
 
-    <div id="controls">
-        <button onclick="admin('start')">開始</button>
-        <button onclick="admin('reset')">重置</button>
+    <div id="winner-overlay">
+        <div id="win-title">紅隊獲勝</div>
+        <div id="win-detail">比分 100 : 80</div>
+        <h3>🏆 榮耀名單 🏆</h3>
+        <div id="win-names-box"></div>
     </div>
+
+    <div id="controls">按 S 開始 | 按 R 重置</div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        
+        let timerInterval;
+
+        // 1. 更新分數與拔河條
         socket.on('updateScore', (state) => {
-            const total = state.teamA + state.teamB;
             document.getElementById('scoreA').innerText = state.teamA;
             document.getElementById('scoreB').innerText = state.teamB;
 
-            // 計算拔河比例 (預設 50%)
+            const total = state.teamA + state.teamB;
             let percentA = 50;
-            if (total > 0) {
-                percentA = (state.teamA / total) * 100;
-            }
+            if (total > 0) percentA = (state.teamA / total) * 100;
             
             document.getElementById('bar-A').style.width = percentA + '%';
             document.getElementById('bar-B').style.width = (100 - percentA) + '%';
         });
 
-        function admin(action) {
-            socket.emit('adminAction', action);
-        }
-        
-        // 鍵盤快速鍵 (S開始, R重置)
-        document.addEventListener('keydown', (e) => {
-            if(e.key === 's' || e.key === 'S') admin('start');
-            if(e.key === 'r' || e.key === 'R') admin('reset');
+        // 2. 更新玩家名單 (新增)
+        socket.on('updatePlayers', (players) => {
+            renderList('content-A', players.A);
+            renderList('content-B', players.B);
         });
+
+        function renderList(elementId, names) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = names.map(n => `<span class="p-name">${n}</span>`).join('');
+            // 自動捲動到底部
+            const parent = container.parentElement;
+            parent.scrollTop = parent.scrollHeight;
+        }
+
+        // 3. 遊戲開始倒數
+        socket.on('gameStart', (duration) => {
+            document.getElementById('winner-overlay').style.display = 'none';
+            let timeLeft = duration;
+            const timerEl = document.getElementById('timer');
+            timerEl.innerText = timeLeft;
+            timerEl.classList.remove('urgent');
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerEl.innerText = timeLeft;
+                if (timeLeft <= 5) timerEl.classList.add('urgent');
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    timerEl.innerText = "TIME UP";
+                }
+            }, 1000);
+        });
+
+        // 4. 遊戲結束 + 禮炮 + 名單
+        socket.on('gameOver', (result) => {
+            clearInterval(timerInterval);
+
+            // 設定贏家顯示
+            const title = document.getElementById('win-title');
+            if (result.winner === 'A') {
+                title.innerText = "🎉 紅隊獲勝！";
+                title.style.color = "#ff4757";
+            } else if (result.winner === 'B') {
+                title.innerText = "🎉 藍隊獲勝！";
+                title.style.color = "#1e90ff";
+            } else {
+                title.innerText = "🤝 勢均力敵！";
+                title.style.color = "#ffd700";
+            }
+            
+            document.getElementById('win-detail').innerText = `最終比分 ${result.scoreA} : ${result.scoreB}`;
+            
+            // 顯示贏家名單
+            document.getElementById('win-names-box').innerHTML = result.winnerNames.map(n => 
+                `<span class="winner-name-tag">${n}</span>`
+            ).join('');
+
+            document.getElementById('winner-overlay').style.display = 'flex';
+
+            // 發射 12 響禮炮
+            fire12Salutes(result.winner);
+        });
+
+        // 5. 重置
+        socket.on('resetGame', () => {
+            document.getElementById('winner-overlay').style.display = 'none';
+            document.getElementById('timer').innerText = "30";
+            renderList('content-A', []);
+            renderList('content-B', []);
+        });
+
+        // 鍵盤監聽
+        document.addEventListener('keydown', (e) => {
+            if(e.key.toLowerCase() === 's') socket.emit('adminAction', 'start');
+            if(e.key.toLowerCase() === 'r') socket.emit('adminAction', 'reset');
+        });
+
+        // --- 12 響禮炮特效 ---
+        function fire12Salutes(winner) {
+            let count = 0;
+            let colors = (winner === 'A') ? ['#ff4757', '#ffffff'] : ['#1e90ff', '#ffffff'];
+            if(winner === 'DRAW') colors = ['#ffd700', '#ffffff'];
+
+            const interval = setInterval(() => {
+                count++;
+                confetti({
+                    particleCount: 150,
+                    spread: 80,
+                    origin: { y: 0.6, x: Math.random() * 0.6 + 0.2 }, // 隨機水平位置
+                    colors: colors,
+                    zIndex: 200
+                });
+
+                if (count >= 12) clearInterval(interval);
+            }, 300); // 每 0.3 秒一發
+        }
     </script>
 </body>
 </html>

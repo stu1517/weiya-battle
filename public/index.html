@@ -5,56 +5,115 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>2025 尾牙大亂鬥</title>
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; text-align: center; background: #222; color: #fff; overflow: hidden; }
-        #selection { display: flex; height: 100vh; }
-        .team-btn { flex: 1; font-size: 2rem; border: none; cursor: pointer; color: white; font-weight: bold; }
+        body { margin: 0; font-family: "Microsoft JhengHei", Arial, sans-serif; text-align: center; background: #222; color: #fff; overflow: hidden; }
+        
+        /* 通用全螢幕區塊 */
+        .page { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; width: 100%; }
+        
+        /* 1. 登入頁 */
+        #login { display: flex; }
+        input { padding: 15px; font-size: 1.5rem; border-radius: 10px; border: none; text-align: center; width: 80%; margin-bottom: 20px; }
+        .btn-confirm { padding: 10px 30px; font-size: 1.5rem; background: #2ed573; color: white; border: none; border-radius: 10px; cursor: pointer; }
+
+        /* 2. 選隊伍頁 */
+        #selection { flex-direction: row; }
+        .team-btn { flex: 1; height: 100%; font-size: 2rem; border: none; cursor: pointer; color: white; font-weight: bold; }
         #btnA { background: #ff4757; } /* 紅隊 */
         #btnB { background: #1e90ff; } /* 藍隊 */
-        
-        #gameArea { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; }
+
+        /* 3. 遊戲頁 */
         #clickBtn { 
-            width: 250px; height: 250px; border-radius: 50%; border: none; 
+            width: 250px; height: 250px; border-radius: 50%; border: 8px solid rgba(255,255,255,0.5); 
             font-size: 2rem; background: #ffa502; color: white; 
             box-shadow: 0 0 20px rgba(255, 165, 2, 0.8);
             transition: transform 0.05s;
         }
         #clickBtn:active { transform: scale(0.95); }
-        h2 { margin-bottom: 20px; }
+        #clickBtn:disabled { background: #535c68; box-shadow: none; border-color: #333; }
+        
+        h2 { margin-bottom: 20px; font-size: 2rem; }
+        #timerDisplay { font-size: 4rem; color: #ffa502; margin-bottom: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div id="selection">
-        <button id="btnA" class="team-btn" onclick="selectTeam('A')">我是<br>紅隊</button>
-        <button id="btnB" class="team-btn" onclick="selectTeam('B')">我是<br>藍隊</button>
+    <div id="login" class="page">
+        <h2>請輸入您的姓名</h2>
+        <input type="text" id="username" placeholder="王小明" />
+        <button class="btn-confirm" onclick="confirmName()">下一步</button>
     </div>
 
-    <div id="gameArea">
-        <h2 id="statusText">等待開始...</h2>
-        <button id="clickBtn" onclick="sendClick()">連擊!!</button>
+    <div id="selection" class="page">
+        <button id="btnA" class="team-btn" onclick="joinGame('A')">加入<br>紅隊</button>
+        <button id="btnB" class="team-btn" onclick="joinGame('B')">加入<br>藍隊</button>
+    </div>
+
+    <div id="gameArea" class="page">
+        <div id="timerDisplay">準備</div>
+        <h2 id="statusText">等待主持人開始...</h2>
+        <button id="clickBtn" onclick="sendClick()" disabled>連擊!!</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        let myName = '';
         let myTeam = '';
 
-        function selectTeam(team) {
+        // 鎖定手機直式操作 (防止誤觸縮放)
+        document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+
+        function confirmName() {
+            const nameInput = document.getElementById('username').value.trim();
+            if (!nameInput) { alert("請輸入姓名！"); return; }
+            myName = nameInput;
+            showPage('selection');
+        }
+
+        function joinGame(team) {
             myTeam = team;
-            document.getElementById('selection').style.display = 'none';
-            document.getElementById('gameArea').style.display = 'flex';
-            document.body.style.background = team === 'A' ? '#ff4757' : '#1e90ff';
+            // 發送加入事件
+            socket.emit('join', { name: myName, team: myTeam });
+            
+            showPage('gameArea');
+            document.body.style.background = (team === 'A') ? '#ff4757' : '#1e90ff';
+            document.getElementById('statusText').innerText = `我是 ${team==='A'?'紅':'藍'}隊：${myName}`;
+        }
+
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+            document.getElementById(id).style.display = 'flex';
         }
 
         function sendClick() {
-            // 手機震動反饋 (提升打擊感)
             if (navigator.vibrate) navigator.vibrate(50);
             socket.emit('click', myTeam);
         }
 
-        socket.on('gameStatus', (started) => {
-            document.getElementById('statusText').innerText = started ? "瘋狂點擊！！！" : "遊戲暫停/結束";
-            document.getElementById('clickBtn').disabled = !started;
+        // --- 監聽事件 ---
+
+        socket.on('gameStart', (duration) => {
+            document.getElementById('clickBtn').disabled = false;
+            document.getElementById('clickBtn').style.background = "#ffa502";
+            
+            // 手機端倒數視覺 (僅供參考，以 Server 為準)
+            let timeLeft = duration;
+            document.getElementById('timerDisplay').innerText = timeLeft;
+            const timer = setInterval(() => {
+                timeLeft--;
+                if(timeLeft <= 0) clearInterval(timer);
+                document.getElementById('timerDisplay').innerText = timeLeft > 0 ? timeLeft : "時間到";
+            }, 1000);
+        });
+
+        socket.on('gameOver', () => {
+            document.getElementById('clickBtn').disabled = true;
+            document.getElementById('timerDisplay').innerText = "結束";
+        });
+
+        socket.on('resetGame', () => {
+            // 重置時踢回首頁重新輸入 (或依需求保留)
+            location.reload();
         });
     </script>
 </body>
